@@ -19,6 +19,7 @@
 
     <properties>
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
+        <url>-Durl=example.com/foo/bar</url>
     </properties>
 
     <dependencyManagement>
@@ -206,7 +207,7 @@
                 <configuration>
                     <serverId>deploy-server</serverId>
                     <fromFile>camus-shopify/target/camus-shopify-0.1.0-shopify1.jar</fromFile>
-                    <url>scp://hadoop-etl1.chi.shopify.com/u/apps/camus</url>
+                    <url>scp://${url}</url>
                 </configuration>
             </plugin>
 
