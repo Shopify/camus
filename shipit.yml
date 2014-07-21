@@ -1,0 +1,3 @@
+deploy:
+    override:
+        - bash -c "mvn clean package && mvn wagon:upload-single"

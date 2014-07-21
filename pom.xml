@@ -173,22 +173,43 @@
     </issueManagement>
 
     <repositories>
-        <!--<repository>-->
-            <!--<id>apache-releases</id>-->
-            <!--<url>https://repository.apache.org/content/groups/public</url>-->
-        <!--</repository>-->
-
-
         <repository>
             <id>cloudera</id>
             <url>https://repository.cloudera.com/artifactory/cloudera-repos/</url>
         </repository>
-
-
     </repositories>
 
     <build>
+
+        <extensions>
+            <extension>
+                <groupId>org.apache.maven.wagon</groupId>
+                <artifactId>wagon-ssh</artifactId>
+                <version>2.6</version>
+            </extension>
+        </extensions>
+
         <plugins>
+            <plugin>
+                <groupId>org.codehaus.mojo</groupId>
+                <artifactId>wagon-maven-plugin</artifactId>
+                <version>1.0-beta-5</version>
+                <executions>
+                    <execution>
+                        <id>upload-jar-to-server</id>
+                        <phase>deploy</phase>
+                        <goals>
+                            <goal>upload-single</goal>
+                        </goals>
+                    </execution>
+                </executions>
+                <configuration>
+                    <serverId>deploy-server</serverId>
+                    <fromFile>camus-shopify/target/camus-shopify-0.1.0-shopify1.jar</fromFile>
+                    <url>scp://hadoop-etl1.chi.shopify.com/u/apps/camus</url>
+                </configuration>
+            </plugin>
+
             <plugin>
                 <groupId>org.apache.maven.plugins</groupId>
                 <artifactId>maven-jar-plugin</artifactId>
@@ -201,6 +222,7 @@
                     </execution>
                 </executions>
             </plugin>
+
             <plugin>
                 <artifactId>maven-install-plugin</artifactId>
                 <version>2.3.1</version>

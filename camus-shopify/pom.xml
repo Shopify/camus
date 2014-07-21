@@ -27,6 +27,15 @@
         </dependency>
     </dependencies>
 
+
+    <distributionManagement>
+        <repository>
+            <id>deploy-server</id>
+            <name>Hadoop ETL server</name>
+            <url>scpexe://hadoop-etl1.chi.shopify.com/u/apps/camus</url>
+        </repository>
+    </distributionManagement>
+
     <build>
         <plugins>
             <plugin>
