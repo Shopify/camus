@@ -1,4 +1,4 @@
 deploy:
     override:
         - mvn clean package
-        - mvn wagon:upload-single -Durl=hadoop-etl1.chi.shopify.com/u/apps/camus
+        - scp camus-shopify/target/*.jar hadoop-etl1.chi.shopify.com:/u/apps/camus
