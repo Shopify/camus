@@ -1,3 +1,4 @@
 deploy:
     override:
-        - bash -c "mvn clean package && mvn wagon:upload-single -Durl=hadoop-etl1.chi.shopify.com/u/apps/camus"
+        - mvn clean package
+        - mvn wagon:upload-single -Durl=hadoop-etl1.chi.shopify.com/u/apps/camus
