@@ -1,4 +1,4 @@
 deploy:
     override:
         - mvn clean package
-        - scp camus-shopify/target/*.jar deploy@hadoop-etl1.chi.shopify.com:/u/apps/camus
+        - /etc/azkaban/azkaban-submit-job
