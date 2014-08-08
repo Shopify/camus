@@ -26,9 +26,6 @@ public class ShopifyPartitioner extends Partitioner {
     public String generatePartitionedPath(JobContext context, String topic, String brokerId, int partitionId, String encodedPartition) {
         StringBuilder sb = new StringBuilder();
         sb.append(topic).append("/");
-        if (context.getConfiguration().get(EtlMultiOutputFormat.ETL_DESTINATION_PATH_TOPIC_SUBDIRECTORY) != "") {
-            sb.append(EtlMultiOutputFormat.getDestPathTopicSubDir(context)).append("/");
-        }
         DateTime bucket = new DateTime(Long.valueOf(encodedPartition));
         sb.append(bucket.toString(outputDateFormatter));
         return sb.toString();
