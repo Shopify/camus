@@ -183,7 +183,7 @@ public class EtlMultiOutputFormat extends FileOutputFormat<EtlKey, Object> {
 
     public static String getWorkingFileName(JobContext context, EtlKey key) throws IOException {
         Partitioner partitioner = getPartitioner(context, key.getTopic());
-        return "data." + key.getTopic().replaceAll("\\.", "_") + "." + key.getLeaderId() + "." + key.getPartition() + "." + partitioner.encodePartition(context, key);
+        return "data." + key.getTopic() + "." + key.getLeaderId() + "." + key.getPartition() + "." + partitioner.encodePartition(context, key);
     }
 
     public static void setDefaultPartitioner(JobContext job, Class<?> cls) {
