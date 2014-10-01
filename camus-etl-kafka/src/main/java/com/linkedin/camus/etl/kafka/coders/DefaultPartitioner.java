@@ -26,7 +26,7 @@ public class DefaultPartitioner extends Partitioner {
     @Override
     public String generatePartitionedPath(JobContext context, String topic, String brokerId, int partitionId, String encodedPartition) {
         StringBuilder sb = new StringBuilder();
-        sb.append(topic).append("/");
+        sb.append(topic.replaceAll("_", "\\.")).append("/");
         sb.append(EtlMultiOutputFormat.getDestPathTopicSubDir(context)).append("/");
         DateTime bucket = new DateTime(Long.valueOf(encodedPartition));
         sb.append(bucket.toString(outputDateFormatter));
