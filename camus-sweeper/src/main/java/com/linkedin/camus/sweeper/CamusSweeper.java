@@ -123,8 +123,9 @@ public class CamusSweeper extends Configured implements Tool
   private Map<FileStatus, String> findAllTopics(Path input, PathFilter filter, String topicSubdir, String topicNameSpace, FileSystem fs) throws IOException{
     Map<FileStatus, String> topics = new HashMap<FileStatus, String>();
 
+
     for (FileStatus f : fs.listStatus(input, filter)){
-      if (fs.exists(new Path(f.getPath(), topicSubdir))){
+      if (fs.exists(new Path(f.getPath() + "/" + topicSubdir))){
         topics.put(f, topicNameSpace);
       } else if (! input.toString().equals(f.getPath().toString())) {
         findAllTopics(f.getPath(), filter, topicSubdir, (topicNameSpace.isEmpty() ? "" : topicNameSpace + "/") + f.getPath().getName(), fs);
@@ -174,17 +175,17 @@ public class CamusSweeper extends Configured implements Tool
 
     for (FileStatus topic : topics.keySet())
     {
-      String topicName = topics.get(topic).replaceAll("/", "_") + "_" + topic.getPath().getName();
+      String topicName = topic.getPath().getName();
       log.info("Processing topic " + topicName);
+
 
       Path destinationPath = new Path(destLocation + "/" + topics.get(topic) + "/" + topic.getPath().getName() + "/" + destSubdir);
       try
       {
-        runCollectorForTopicDir(fs, topicName, new Path(topic.getPath(), sourceSubdir), destinationPath);
+        runCollectorForTopicDir(fs, topicName, new Path(topic.getPath() + "/" + sourceSubdir), destinationPath);
       }
       catch (Exception e)
       {
-        System.err.println("unable to process " + topicName + " skipping...");
         e.printStackTrace();
       }
     }
@@ -212,7 +213,6 @@ public class CamusSweeper extends Configured implements Tool
 
   private void runCollectorForTopicDir(FileSystem fs, String topic, Path topicSourceDir, Path topicDestDir) throws Exception
   {
-    log.info("Running collector for topic " + topic + " source:" + topicSourceDir + " dest:" + topicDestDir);
     ArrayList<Future<?>> tasksToComplete = new ArrayList<Future<?>>();
 
     List<Properties> jobPropsList = planner.createSweeperJobProps(topic, topicSourceDir, topicDestDir, fs);
@@ -221,7 +221,6 @@ public class CamusSweeper extends Configured implements Tool
       tasksToComplete.add(runCollector(jobProps, topic));
     }
 
-    log.info("Finishing processing for topic " + topic);
   }
 
   @SuppressWarnings("unchecked")
@@ -257,9 +256,9 @@ public class CamusSweeper extends Configured implements Tool
       KafkaCollector collector = null;
       try
       {
-        log.info("Starting runner for " + name);
+        System.out.println("Starting runner for " + name);
         collector = new KafkaCollector("test", props, name, topic);
-        log.info("Running " + name + " for input " + props.getProperty("input.paths"));
+        System.out.println("Running " + name + " for input " + props.getProperty("input.paths"));
         collector.run();
       }
       catch (Throwable e) // Sometimes the error is the Throwable, e.g. java.lang.NoClassDefFoundError
@@ -296,12 +295,16 @@ public class CamusSweeper extends Configured implements Tool
     {
       for (FileStatus stat : fs.listStatus(path))
       {
+
         if (stat.isDir())
         {
           addInputPath(job, stat.getPath(), fs);
         }
         else if (stat.getPath().getName().endsWith("avro"))
         {
+          FileInputFormat.addInputPath(job, stat.getPath());
+        }
+        else {
           FileInputFormat.addInputPath(job, stat.getPath());
         }
       }
@@ -356,11 +359,13 @@ public class CamusSweeper extends Configured implements Tool
       Path outputPath = new Path(job.getConfiguration().get("dest.path"));
 
       FileOutputFormat.setOutputPath(job, tmpPath);
+
+      System.out.println("JOB: "+ job.toString());
       ((CamusSweeperJob) Class.forName(props.getProperty("camus.sweeper.io.configurer.class"))
           .newInstance()).setLogger(log).configureJob(topicName, job);
       job.submit();
       runningJobs.add(job);
-      log.info("job running: " + job.getTrackingURL() + " for: " + jobName);
+      System.out.println("job running: " + job.getTrackingURL() + " for: " + jobName);
       job.waitForCompletion(false);
 
       if (!job.isSuccessful())
