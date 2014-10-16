@@ -1,19 +1,15 @@
 package com.linkedin.camus.sweeper.mapreduce;
 
-import org.apache.hadoop.mapreduce.InputFormat;
-import org.apache.hadoop.mapreduce.Job;
-import org.apache.hadoop.mapreduce.Mapper;
-import org.apache.hadoop.mapreduce.OutputFormat;
-import org.apache.hadoop.mapreduce.Reducer;
-import org.apache.log4j.Logger;
-
 import com.linkedin.camus.sweeper.utils.RelaxedAvroSerialization;
+import org.apache.hadoop.io.RawComparator;
+import org.apache.hadoop.mapreduce.*;
+import org.apache.log4j.Logger;
 
 @SuppressWarnings("rawtypes")
 public abstract class CamusSweeperJob
 {
   protected Logger log;
-  
+
   public CamusSweeperJob setLogger(Logger log)
   {
     this.log = log;
@@ -45,11 +41,25 @@ public abstract class CamusSweeperJob
     job.setOutputKeyClass(outKey);
     job.setOutputValueClass(outValue);
   }
-  
+
+    protected void configureOutput(Job job,
+                                   Class<? extends OutputFormat> outputFormat,
+                                   Class<? extends Reducer> reducer,
+                                   Class<?> outKey,
+                                   Class<?> outValue,
+                                   Class<? extends RawComparator> comparator)
+    {
+        job.setOutputFormatClass(outputFormat);
+        job.setReducerClass(reducer);
+        job.setOutputKeyClass(outKey);
+        job.setOutputValueClass(outValue);
+        job.setSortComparatorClass(comparator);
+    }
+
   protected String getConfValue(Job job, String topic, String key, String defaultStr){
     return job.getConfiguration().get(topic + "." + key, job.getConfiguration().get(key, defaultStr));
   }
-  
+
   protected String getConfValue(Job job, String topic, String key){
     return getConfValue(job, topic, key, null);
   }
