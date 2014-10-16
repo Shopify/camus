@@ -32,9 +32,9 @@ public class EtlRecordReader extends RecordReader<EtlKey, CamusWrapper> {
     private static final String PRINT_MAX_DECODER_EXCEPTIONS = "max.decoder.exceptions.to.print";
     private static final String DEFAULT_SERVER = "server";
     private static final String DEFAULT_SERVICE = "service";
-    private static final String STATSD_ENABLED = "statsd.enabled";
-    private static final String STATSD_HOST = "statsd.host";
-    private static final String STATSD_PORT = "statsd.port";
+    public static final String STATSD_ENABLED = "statsd.enabled";
+    public static final String STATSD_HOST = "statsd.host";
+    public static final String STATSD_PORT = "statsd.port";
 
     private TaskAttemptContext context;
 

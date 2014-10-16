@@ -16,6 +16,8 @@ import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.io.SequenceFile;
 import org.apache.hadoop.mapred.*;
 import org.apache.hadoop.mapred.JobID;
+import org.apache.hadoop.mapred.TaskCompletionEvent;
+import org.apache.hadoop.mapred.TaskReport;
 import org.apache.hadoop.mapreduce.*;
 import org.apache.hadoop.mapreduce.Counters;
 import org.apache.hadoop.mapreduce.JobContext;

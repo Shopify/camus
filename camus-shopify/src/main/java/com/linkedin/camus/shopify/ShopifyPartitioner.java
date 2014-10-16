@@ -1,4 +1,4 @@
-package com.linkedin.camus.etl.kafka.coders;
+package com.linkedin.camus.shopify;
 
 import com.linkedin.camus.coders.Partitioner;
 import com.linkedin.camus.etl.IEtlKey;

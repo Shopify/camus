@@ -1,30 +1,8 @@
 package com.linkedin.camus.sweeper;
 
-import java.io.File;
-import java.io.FileInputStream;
-import java.io.IOException;
-import java.util.ArrayList;
-import java.util.Collection;
-import java.util.Collections;
-import java.util.HashMap;
-import java.util.HashSet;
-import java.util.List;
-import java.util.Map;
-import java.util.Map.Entry;
-import java.util.Properties;
-import java.util.UUID;
-import java.util.concurrent.ExecutorService;
-import java.util.concurrent.Executors;
-import java.util.concurrent.Future;
-import java.util.concurrent.TimeUnit;
-import java.util.regex.Pattern;
-
-import org.apache.commons.cli.CommandLine;
-import org.apache.commons.cli.CommandLineParser;
-import org.apache.commons.cli.HelpFormatter;
-import org.apache.commons.cli.OptionBuilder;
-import org.apache.commons.cli.Options;
-import org.apache.commons.cli.PosixParser;
+import com.linkedin.camus.sweeper.mapreduce.CamusSweeperJob;
+import com.linkedin.camus.sweeper.utils.Utils;
+import org.apache.commons.cli.*;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.conf.Configured;
 import org.apache.hadoop.fs.FileStatus;
@@ -41,8 +19,17 @@ import org.apache.hadoop.util.ToolRunner;
 import org.apache.log4j.Logger;
 import org.joda.time.DateTimeZone;
 
-import com.linkedin.camus.sweeper.mapreduce.CamusSweeperJob;
-import com.linkedin.camus.sweeper.utils.Utils;
+import java.io.File;
+import java.io.FileInputStream;
+import java.io.IOException;
+import java.io.InputStream;
+import java.util.*;
+import java.util.Map.Entry;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
+import java.util.concurrent.TimeUnit;
+import java.util.regex.Pattern;
 
 @SuppressWarnings("deprecation")
 public class CamusSweeper extends Configured implements Tool
@@ -55,12 +42,12 @@ public class CamusSweeper extends Configured implements Tool
   private Properties props;
   private ExecutorService executorService;
   private FsPermission perm = new FsPermission(FsAction.ALL, FsAction.READ_EXECUTE, FsAction.READ_EXECUTE);
-  
+
   private String destSubdir;
   private String sourceSubdir;
-  
+
   private static Logger log = Logger.getLogger(CamusSweeper.class);
-  
+
   private CamusSweeperPlanner planner;
 
 
@@ -82,7 +69,8 @@ public class CamusSweeper extends Configured implements Tool
     this.runningJobs = Collections.synchronizedList(new ArrayList<Job>());
     sourceSubdir = props.getProperty("camus.sweeper.source.subdir");
     destSubdir = props.getProperty("camus.sweeper.dest.subdir");
-
+    System.out.println("Init");
+    System.out.println(props.toString());
     try
     {
       planner = ((CamusSweeperPlanner) Class.forName(props.getProperty("camus.sweeper.planner.class")).newInstance()).setPropertiesLogger(props, log);
@@ -91,7 +79,7 @@ public class CamusSweeper extends Configured implements Tool
     {
       throw new RuntimeException(e);
     }
-    
+
   }
 
   // TODO:
@@ -118,12 +106,12 @@ public class CamusSweeper extends Configured implements Tool
       }
     }
   }
-  
+
   private Map<FileStatus, String> findAllTopics(Path input, PathFilter filter, String topicSubdir, String topicNameSpace, FileSystem fs) throws IOException{
     Map<FileStatus, String> topics = new HashMap<FileStatus, String>();
-    
+
     for (FileStatus f : fs.listStatus(input, filter)){
-      if (fs.exists(new Path(f.getPath(), topicSubdir))){
+      if (fs.exists(new Path(f.getPath() + "/" + topicSubdir))){
         topics.put(f, topicNameSpace);
       } else if (! input.toString().equals(f.getPath().toString())) {
         findAllTopics(f.getPath(), filter, topicSubdir, (topicNameSpace.isEmpty() ? "" : topicNameSpace + "/") + f.getPath().getName(), fs);
@@ -132,21 +120,30 @@ public class CamusSweeper extends Configured implements Tool
     return topics;
   }
 
+  public void runFromAzkaban() throws Exception {
+    String camusPropertiesPath = System.getProperty("sun.java.command").split("-P ")[1];
+    String[] args = new String[2];
+    args[0] = "-P";
+    args[1] = camusPropertiesPath;
+    ToolRunner.run(this, args);
+  }
+
+
   public void run() throws Exception
   {
-    log.info("Starting kafka sweeper");
+    System.out.println("Starting kafka sweeper");
     int numThreads = Integer.parseInt(props.getProperty("num.threads", DEFAULT_NUM_THREADS));
 
     executorService = Executors.newFixedThreadPool(numThreads);
 
     String fromLocation = (String) props.getProperty("camus.sweeper.source.dir");
     String destLocation = (String) props.getProperty("camus.sweeper.dest.dir", "");
-    
+
     if (destLocation.isEmpty())
       destLocation = fromLocation;
 
-    log.info("fromLocation: " + fromLocation);
-    log.info("destLocation: " + destLocation);
+    System.out.println("fromLocation: " + fromLocation);
+    System.out.println("destLocation: " + destLocation);
 
     List<String> blacklist = Utils.getStringList(props, "camus.sweeper.blacklist");
     List<String> whitelist = Utils.getStringList(props, "camus.sweeper.whitelist");
@@ -163,13 +160,13 @@ public class CamusSweeper extends Configured implements Tool
 
     for (FileStatus topic : topics.keySet())
     {
-      String topicName = topics.get(topic).replaceAll("/", "_") + "_" + topic.getPath().getName();
-      log.info("Processing topic " + topicName);
+      String topicName = topic.getPath().getName();
+      System.out.println("Processing topic " + topicName);
 
       Path destinationPath = new Path(destLocation + "/" + topics.get(topic) + "/" + topic.getPath().getName() + "/" + destSubdir);
       try
       {
-        runCollectorForTopicDir(fs, topicName, new Path(topic.getPath(), sourceSubdir), destinationPath);
+        runCollectorForTopicDir(fs, topicName, new Path(topic.getPath() + "/" + sourceSubdir), destinationPath);
       }
       catch (Exception e)
       {
@@ -178,14 +175,14 @@ public class CamusSweeper extends Configured implements Tool
       }
     }
 
-    log.info("Shutting down executor");
+    System.out.println("Shutting down executor");
     executorService.shutdown();
     while (!executorService.isTerminated())
     {
       executorService.awaitTermination(30, TimeUnit.SECONDS);
     }
 
-    log.info("Shutting down");
+    System.out.println("Shutting down");
 
     if (!errorMessages.isEmpty())
     {
@@ -201,16 +198,16 @@ public class CamusSweeper extends Configured implements Tool
 
   private void runCollectorForTopicDir(FileSystem fs, String topic, Path topicSourceDir, Path topicDestDir) throws Exception
   {
-    log.info("Running collector for topic " + topic + " source:" + topicSourceDir + " dest:" + topicDestDir);
+    System.out.println("Running collector for topic " + topic + " source:" + topicSourceDir + " dest:" + topicDestDir);
     ArrayList<Future<?>> tasksToComplete = new ArrayList<Future<?>>();
-    
+
     List<Properties> jobPropsList = planner.createSweeperJobProps(topic, topicSourceDir, topicDestDir, fs);
-    
+
     for (Properties jobProps : jobPropsList){
       tasksToComplete.add(runCollector(jobProps, topic));
     }
 
-    log.info("Finishing processing for topic " + topic);
+    System.out.println("Finishing processing for topic " + topic);
   }
 
   @SuppressWarnings("unchecked")
@@ -222,7 +219,7 @@ public class CamusSweeper extends Configured implements Tool
     if (props.containsKey("reduce.count.override." + topic))
       props.put("reducer.count", Integer.parseInt(props.getProperty("reduce.count.override." + topic)));
 
-    log.info("Processing " + props.get("input.paths"));
+    System.out.println("Processing " + props.get("input.paths"));
     return executorService.submit(new KafkaCollectorRunner(jobName, props, errorMessages, topic));
   }
 
@@ -233,7 +230,8 @@ public class CamusSweeper extends Configured implements Tool
     private List<SweeperError> errorQueue;
     private String topic;
 
-    public KafkaCollectorRunner(String name, Properties props, List<SweeperError> errorQueue, String topic)
+
+      public KafkaCollectorRunner(String name, Properties props, List<SweeperError> errorQueue, String topic)
     {
       this.name = name;
       this.props = props;
@@ -246,16 +244,16 @@ public class CamusSweeper extends Configured implements Tool
       KafkaCollector collector = null;
       try
       {
-        log.info("Starting runner for " + name);
+        System.out.println("Starting runner for " + name);
         collector = new KafkaCollector("test", props, name, topic);
-        log.info("Running " + name + " for input " + props.getProperty("input.paths"));
+        System.out.println("Running " + name + " for input " + props.getProperty("input.paths"));
         collector.run();
       }
       catch (Throwable e) // Sometimes the error is the Throwable, e.g. java.lang.NoClassDefFoundError
       {
         e.printStackTrace();
-        log.error("Failed for " + name 
-                  + " ,job: " + collector == null ? null : collector.getJob() 
+        log.error("Failed for " + name
+                  + " ,job: " + collector == null ? null : collector.getJob()
                   + " failed for " + props.getProperty("input.paths") + " Exception:"
                   + e.getLocalizedMessage());
         errorQueue.add(new SweeperError(name, props.get("input.paths").toString(), e));
@@ -271,7 +269,8 @@ public class CamusSweeper extends Configured implements Tool
     private final String jobName;
     private final Properties props;
     private final String topicName;
-    
+    private final List VALID_FILE_EXTENSIONS = Arrays.asList(new String[] {"gz", "avro", "snappy", "deflate", "bz2", "lzo"});
+
     private Job job;
 
     public KafkaCollector(String name, Properties props, String jobName, String topicName)
@@ -283,13 +282,16 @@ public class CamusSweeper extends Configured implements Tool
 
     private void addInputPath(Job job, Path path, FileSystem fs) throws IOException
     {
+
       for (FileStatus stat : fs.listStatus(path))
       {
+        String name = stat.getPath().getName();
+        String[] parts = name.split("\\.");
         if (stat.isDir())
         {
           addInputPath(job, stat.getPath(), fs);
         }
-        else if (stat.getPath().getName().endsWith("avro"))
+        else if (VALID_FILE_EXTENSIONS.contains(parts[parts.length-1]))
         {
           FileInputFormat.addInputPath(job, stat.getPath());
         }
@@ -337,9 +339,9 @@ public class CamusSweeper extends Configured implements Tool
         numReducers = Math.min((int) (dus / AVERAGE_FILE_SIZE) + 1, maxFiles);
       }
 
-      log.info("Setting reducer " + numReducers);
+      System.out.println("Setting reducer " + numReducers);
       job.setNumReduceTasks(numReducers);
-      job.getConfiguration().set("mapred.compress.map.output", "true");
+      job.getConfiguration().set("mapred.compress.map.output", "false");
 
       Path tmpPath = new Path(job.getConfiguration().get("tmp.path"));
       Path outputPath = new Path(job.getConfiguration().get("dest.path"));
@@ -349,7 +351,7 @@ public class CamusSweeper extends Configured implements Tool
           .newInstance()).setLogger(log).configureJob(topicName, job);
       job.submit();
       runningJobs.add(job);
-      log.info("job running: " + job.getTrackingURL() + " for: " + jobName);
+      System.out.println("job running: " + job.getTrackingURL() + " for: " + jobName);
       job.waitForCompletion(false);
 
       if (!job.isSuccessful())
@@ -362,7 +364,7 @@ public class CamusSweeper extends Configured implements Tool
       if (fs.exists(outputPath))
       {
         oldPath = new Path("/tmp", "_old_" + job.getJobID());
-        log.info("Path " + outputPath + " exists. Overwriting.");
+        System.out.println("Path " + outputPath + " exists. Overwriting.");
         if (!fs.rename(outputPath, oldPath))
         {
           fs.delete(tmpPath, true);
@@ -370,7 +372,7 @@ public class CamusSweeper extends Configured implements Tool
         }
       }
 
-      log.info("Swapping " + tmpPath + " to " + outputPath);
+      System.out.println("Swapping " + tmpPath + " to " + outputPath);
       mkdirs(fs, outputPath.getParent(), perm);
       fs.mkdirs(outputPath.getParent(), perm);
       if (!fs.rename(tmpPath, outputPath))
@@ -382,7 +384,7 @@ public class CamusSweeper extends Configured implements Tool
 
       if (oldPath != null && fs.exists(oldPath))
       {
-        log.info("Deleting " + oldPath);
+        System.out.println("Deleting " + oldPath);
         fs.delete(oldPath, true);
       }
     }
@@ -390,7 +392,7 @@ public class CamusSweeper extends Configured implements Tool
     protected Job getJob() {
       return job;
     }
-    
+
     private long duDirectory(FileSystem fs, Path dir) throws IOException
     {
       String name = dir.getName();
@@ -416,21 +418,21 @@ public class CamusSweeper extends Configured implements Tool
       return sum;
     }
   }
-  
+
   private void mkdirs(FileSystem fs, Path path, FsPermission perm) throws IOException{
-    log.info("mkdir: " + path);
+    System.out.println("mkdir: " + path);
     if (! fs.exists(path.getParent()))
       mkdirs(fs, path.getParent(), perm);
     fs.mkdirs(path, perm);
   }
-  
+
   private Pattern compileMultiPattern(Collection<String> list){
     String patternStr = "(";
-    
+
     for (String str : list){
       patternStr += str + "|";
     }
-    
+
     patternStr = patternStr.substring(0, patternStr.length() - 1) + ")";
     return Pattern.compile(patternStr);
   }
@@ -446,13 +448,13 @@ public class CamusSweeper extends Configured implements Tool
         this.whitelist = Pattern.compile(".*");  //whitelist everything
       else
         this.whitelist = compileMultiPattern(whitelist);
-      
+
       if (blacklist.isEmpty())
         this.blacklist = Pattern.compile("a^");  //blacklist nothing
       else
         this.blacklist = compileMultiPattern(blacklist);
-      log.info("whitelist: " + whitelist);
-      log.info("blacklist: " + blacklist);
+      System.out.println("whitelist: " + whitelist);
+      System.out.println("blacklist: " + blacklist);
     }
 
     @Override
