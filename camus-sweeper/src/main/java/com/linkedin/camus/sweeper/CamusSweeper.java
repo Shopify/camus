@@ -3,6 +3,7 @@ package com.linkedin.camus.sweeper;
 import java.io.File;
 import java.io.FileInputStream;
 import java.io.IOException;
+import java.util.Arrays;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Collections;
@@ -123,13 +124,19 @@ public class CamusSweeper extends Configured implements Tool
     Map<FileStatus, String> topics = new HashMap<FileStatus, String>();
     
     for (FileStatus f : fs.listStatus(input, filter)){
-      if (fs.exists(new Path(f.getPath(), topicSubdir))){
+      if (fs.exists(new Path(f.getPath() + "/" + topicSubdir))){
         topics.put(f, topicNameSpace);
       } else if (! input.toString().equals(f.getPath().toString())) {
         findAllTopics(f.getPath(), filter, topicSubdir, (topicNameSpace.isEmpty() ? "" : topicNameSpace + "/") + f.getPath().getName(), fs);
       }
     }
     return topics;
+  }
+
+  public void runFromAzkaban() throws Exception {
+    String camusPropertiesPath = System.getProperty("sun.java.command").split("-P ")[1];
+    String[] args = {"-P", camusPropertiesPath};
+    ToolRunner.run(this, args);
   }
 
   public void run() throws Exception
@@ -163,13 +170,13 @@ public class CamusSweeper extends Configured implements Tool
 
     for (FileStatus topic : topics.keySet())
     {
-      String topicName = topics.get(topic).replaceAll("/", "_") + "_" + topic.getPath().getName();
+      String topicName = topic.getPath().getName();
       log.info("Processing topic " + topicName);
 
       Path destinationPath = new Path(destLocation + "/" + topics.get(topic) + "/" + topic.getPath().getName() + "/" + destSubdir);
       try
       {
-        runCollectorForTopicDir(fs, topicName, new Path(topic.getPath(), sourceSubdir), destinationPath);
+        runCollectorForTopicDir(fs, topicName, new Path(topic.getPath() + "/" + sourceSubdir), destinationPath);
       }
       catch (Exception e)
       {
@@ -271,6 +278,7 @@ public class CamusSweeper extends Configured implements Tool
     private final String jobName;
     private final Properties props;
     private final String topicName;
+    private final List VALID_FILE_EXTENSIONS = Arrays.asList(new String[] {"gz", "avro", "snappy", "deflate", "bz2", "lzo"});
     
     private Job job;
 
@@ -285,11 +293,13 @@ public class CamusSweeper extends Configured implements Tool
     {
       for (FileStatus stat : fs.listStatus(path))
       {
+        String name = stat.getPath().getName();
+        String[] parts = name.split("\\.");
         if (stat.isDir())
         {
           addInputPath(job, stat.getPath(), fs);
         }
-        else if (stat.getPath().getName().endsWith("avro"))
+        else if (VALID_FILE_EXTENSIONS.contains(parts[parts.length-1]))
         {
           FileInputFormat.addInputPath(job, stat.getPath());
         }
@@ -339,7 +349,7 @@ public class CamusSweeper extends Configured implements Tool
 
       log.info("Setting reducer " + numReducers);
       job.setNumReduceTasks(numReducers);
-      job.getConfiguration().set("mapred.compress.map.output", "true");
+      job.getConfiguration().set("mapred.compress.map.output", "false");
 
       Path tmpPath = new Path(job.getConfiguration().get("tmp.path"));
       Path outputPath = new Path(job.getConfiguration().get("dest.path"));
