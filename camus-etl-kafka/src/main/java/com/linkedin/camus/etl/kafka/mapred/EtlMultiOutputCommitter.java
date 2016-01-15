@@ -1,18 +1,15 @@
 package com.linkedin.camus.etl.kafka.mapred;
 
-import java.io.BufferedOutputStream;
-import java.io.IOException;
-import java.io.OutputStream;
+import java.io.*;
 import java.lang.reflect.Constructor;
+
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
-import org.apache.hadoop.fs.FileStatus;
-import org.apache.hadoop.fs.FileSystem;
-import org.apache.hadoop.fs.Path;
+import org.apache.hadoop.fs.*;
 import org.apache.hadoop.io.NullWritable;
 import org.apache.hadoop.io.SequenceFile;
 import org.apache.hadoop.mapreduce.JobContext;
@@ -149,10 +146,17 @@ public class EtlMultiOutputCommitter extends FileOutputCommitter {
   }
 
   protected void commitFile(JobContext job, Path source, Path target) throws IOException {
-    log.info(String.format("Moving %s to %s", source, target));
-    if (!FileSystem.get(job.getConfiguration()).rename(source, target)) {
-      log.error(String.format("Failed to move from %s to %s", source, target));
-      throw new IOException(String.format("Failed to move from %s to %s", source, target));
+    FileSystem fs = FileSystem.get(job.getConfiguration());
+
+    if (!fs.exists(target)) {
+      log.info(String.format("Moving %s to %s", source, target));
+      fs.rename(source, target);
+    } else {
+      FileChecksum cs1 = fs.getFileChecksum(source);
+      FileChecksum cs2 = fs.getFileChecksum(target);
+      if (!cs1.equals(cs2)) {
+        throw new IOException(String.format("Target (%s) destination already exists and source (%s) is not the same as target based on checksum comparison.", target, source));
+      }
     }
   }
 
