@@ -63,9 +63,9 @@ def main():
     monitor_cmd += '-cp $(hadoop classpath):/u/apps/camus/current/camus-shopify-0.1.0-shopify1.jar:/etc/camus:/etc/hadoop/conf '
     monitor_cmd += 'com.linkedin.camus.shopify.LateArrivingDataMonitor -c /u/apps/camus/shared/camus.properties"'
 
-    hive_partitions_cmd = 'bash -c"'
-    hive_partitions_cmd += 'HADOOP_USER_NAME=deploy python hive-generic-partitioner.py %s ' % (os.path.join('hdfs://hadoop-production', 'data', 'raw', 'kafka'))
-    hive_partitions_cmd += '--hive-options=\'--auxpath /u/apps/camus/shared/json-serde-1.3.7-jar-with-dependencies.jar'
+    hive_partitions_cmd = 'bash -c "'
+    hive_partitions_cmd += 'HADOOP_USER_NAME=deploy python /u/apps/camus/shared/hive-generic-partitioner.py %s ' % (os.path.join('hdfs://hadoop-production', 'data', 'raw', 'kafka'))
+    hive_partitions_cmd += '--hive-options=\'--auxpath /u/apps/camus/shared/json-serde-1.3.7-jar-with-dependencies.jar\' '
     hive_partitions_cmd += '--database default '
     hive_partitions_cmd += '--verbose"'
 
