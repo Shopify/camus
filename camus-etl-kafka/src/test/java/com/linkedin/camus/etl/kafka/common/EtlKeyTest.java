@@ -78,6 +78,12 @@ public class EtlKeyTest {
     assertFalse(etlKeyA.hashCode() == etlKeyB.hashCode());
   }
 
+  @Test
+  public void testStatsDTags() throws Exception {
+    final EtlKey etlKey = new EtlKey("topic_id", "leader_id", 2);
+    assertEquals(etlKey.statsdTags(), "topic:topic_id,partition:2");
+  }
+
   public static class OldEtlKey implements WritableComparable<OldEtlKey> {
     private String leaderId = "leaderId";
     private int partition = 1;

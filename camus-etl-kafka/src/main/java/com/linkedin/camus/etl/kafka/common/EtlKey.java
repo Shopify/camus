@@ -330,4 +330,8 @@ public class EtlKey implements WritableComparable<EtlKey>, IEtlKey {
     result = 31 * result + partitionMap.hashCode();
     return result;
   }
-}
+
+  public String statsdTags() {
+    return "topic:" + getTopic() + "," + "partition:" + getPartition();
+  }
+ }

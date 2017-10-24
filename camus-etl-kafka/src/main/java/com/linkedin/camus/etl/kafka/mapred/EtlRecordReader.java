@@ -9,6 +9,7 @@ import com.linkedin.camus.etl.kafka.common.EtlKey;
 import com.linkedin.camus.etl.kafka.common.EtlRequest;
 import com.linkedin.camus.etl.kafka.common.ExceptionWritable;
 import com.linkedin.camus.etl.kafka.common.KafkaReader;
+import com.linkedin.camus.etl.kafka.reporter.StatsdReporter;
 import com.linkedin.camus.schemaregistry.SchemaNotFoundException;
 
 import java.io.IOException;
@@ -223,7 +224,7 @@ public class EtlRecordReader extends RecordReader<EtlKey, CamusWrapper> {
           String.format("Time spent on topic %s:%d = %s", key.getTopic(), key.getPartition(), timeSpentOnPartition);
       mapperContext.write(key, new ExceptionWritable(timeSpentOnTopicMsg));
       log.info(timeSpentOnTopicMsg);
-
+      StatsdReporter.gauge(mapperContext.getConfiguration(),"pull-max-time-reached", 1L, key.statsdTags());
       reader = null;
     }
 
@@ -263,7 +264,8 @@ public class EtlRecordReader extends RecordReader<EtlKey, CamusWrapper> {
           statusMsg += statusMsg.length() > 0 ? "; " : "";
           statusMsg += request.getTopic() + ":" + request.getLeaderId() + ":" + request.getPartition();
           context.setStatus(statusMsg);
-
+          Long messagesToRead = request.getLastOffset() - request.getOffset();
+          StatsdReporter.gauge(mapperContext.getConfiguration(),"total.to-read", messagesToRead, key.statsdTags());
           if (reader != null) {
             closeReader();
           }
@@ -353,6 +355,7 @@ public class EtlRecordReader extends RecordReader<EtlKey, CamusWrapper> {
           return true;
         }
         log.info("Records read : " + count);
+        StatsdReporter.gauge(mapperContext.getConfiguration(),"total.event-read-count", (long) count, key.statsdTags());
         count = 0;
         reader = null;
       } catch (Throwable t) {

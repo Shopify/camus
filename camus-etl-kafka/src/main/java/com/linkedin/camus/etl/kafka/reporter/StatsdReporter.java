@@ -4,6 +4,8 @@ import com.timgroup.statsd.StatsDClient;
 import com.timgroup.statsd.NonBlockingStatsDClient;
 import java.util.Map;
 import java.io.IOException;
+
+import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.mapreduce.Job;
 import org.apache.hadoop.mapreduce.Counter;
 import org.apache.hadoop.mapreduce.Counters;
@@ -27,12 +29,16 @@ public class StatsdReporter extends TimeReporter {
     submitCountersToStatsd(job);
   }
 
+  private static StatsDClient getClient(Configuration conf) {
+    return new NonBlockingStatsDClient("Camus", getStatsdHost(conf), getStatsdPort(conf),
+            new String[] { "camus:counters" });
+  }
+
   private void submitCountersToStatsd(Job job) throws IOException {
     Counters counters = job.getCounters();
-    if (getStatsdEnabled(job)) {
-      StatsDClient statsd =
-          new NonBlockingStatsDClient("Camus", getStatsdHost(job), getStatsdPort(job),
-              new String[] { "camus:counters" });
+    Configuration conf = job.getConfiguration();
+    if (getStatsdEnabled(conf)) {
+      StatsDClient statsd = getClient(conf);
       for (CounterGroup counterGroup : counters) {
         for (Counter counter : counterGroup) {
           statsd.gauge(counterGroup.getDisplayName() + "." + counter.getDisplayName(), counter.getValue());
@@ -41,15 +47,22 @@ public class StatsdReporter extends TimeReporter {
     }
   }
 
-  public static Boolean getStatsdEnabled(Job job) {
-    return job.getConfiguration().getBoolean(STATSD_ENABLED, false);
+  public static Boolean getStatsdEnabled(Configuration conf) {
+    return conf.getBoolean(STATSD_ENABLED, false);
   }
 
-  public static String getStatsdHost(Job job) {
-    return job.getConfiguration().get(STATSD_HOST, "localhost");
+  public static String getStatsdHost(Configuration conf) {
+    return conf.get(STATSD_HOST, "localhost");
   }
 
-  public static int getStatsdPort(Job job) {
-    return job.getConfiguration().getInt(STATSD_PORT, 8125);
+  public static int getStatsdPort(Configuration conf) {
+    return conf.getInt(STATSD_PORT, 8125);
+  }
+
+  public static void gauge(Configuration conf, String metric, Long value, String... tags) {
+    if (conf.getBoolean(STATSD_ENABLED, false)) {
+      StatsDClient statsd = getClient(conf);
+      statsd.gauge(metric, value, tags);
+    }
   }
 }
