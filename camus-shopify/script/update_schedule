@@ -66,21 +66,24 @@ def lad_monitor_job(target):
     monitor_cmd += 'com.linkedin.camus.shopify.LateArrivingDataMonitor -c /u/apps/%(target)s/shared/camus.properties"'
     return monitor_cmd % {'target': target}
 
-def camus_project(project_name, target):
+def camus_project(project_name, target, env):
     project = Project(project_name)
 
+    failure_email = 'camus@shopify.pagerduty.com' if env == 'production' else None
+
     project.add_job('Import',
-                    Job({'failure.emails': 'camus@shopify.pagerduty.com',
+                    Job({'failure.emails': failure_email,
                          'type': 'command',
                          'command': camus_job(target)
                          }))
     project.add_job("Watermark",
-                    Job({'failure.emails': 'camus@shopify.pagerduty.com',
+                    Job({'failure.emails': failure_email,
                          'type': 'command',
                          'command': camus_watemark_job(target)
                          }))
     project.add_job("Late-Arriving-Data Monitor",
-                    Job({'type': 'command',
+                    Job({'failure.emails': failure_email,
+                         'type': 'command',
                          'command': lad_monitor_job(target)
                          }))
 
@@ -100,7 +103,7 @@ def main():
         project_name = target.title()
         project_zip = "%s.zip" % target
 
-        project = camus_project(project_name, target)
+        project = camus_project(project_name, target, environment)
 
         logger.info('Building %s file' % project_zip)
         project.build(project_zip, True)
