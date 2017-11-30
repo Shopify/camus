@@ -63,8 +63,13 @@ def lad_monitor_job(target):
     monitor_cmd = 'bash -c "'
     monitor_cmd += 'java -Xms1G -Xmx2G -DHADOOP_USER_NAME=deploy -Dlog4j.configuration=file:/u/apps/%(target)s/shared/log4j.xml '
     monitor_cmd += '-cp $(hadoop classpath):/u/apps/%(target)s/current/camus-shopify-0.1.0-shopify1.jar:/etc/camus:/etc/hadoop/conf '
-    monitor_cmd += 'com.linkedin.camus.shopify.LateArrivingDataMonitor -c /u/apps/%(target)s/shared/camus.properties -t window"'
+    monitor_cmd += 'com.linkedin.camus.shopify.LateArrivingDataMonitor -c /u/apps/%(target)s/shared/camus.properties -t runs -r 1"'
     return monitor_cmd % {'target': target}
+
+def deduplicate_folders():
+    # sha of when the deduplicator was first deployed, modify as needed
+    sha = 'd12baedea506271f1467776691c1ed8329fa8d5e'
+    return 'bash -c "docker run --rm --name=d12baedea506271 --net=host registry.chi2.shopify.io/speedboat:{sha} /app/run-deduplicator.sh"'.format(sha=sha)
 
 def camus_project(project_name, target, env):
     project = Project(project_name)
@@ -86,6 +91,12 @@ def camus_project(project_name, target, env):
                          'type': 'command',
                          'command': lad_monitor_job(target)
                          }))
+    project.add_job("DedupFolders",
+                     Job({'failure.emails': None,
+                          'type': 'command',
+                          'command': deduplicate_folders()
+                          }))
+
 
     return project
 
