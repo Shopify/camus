@@ -86,7 +86,7 @@ class HDFS(object):
 
 def topics_to_upload(path):
     with open(path, "r") as f:
-        topics = [line.strip() for line in f.readlines() if line.strip()]
+        topics = [line.strip().replace("_", ".") for line in f.readlines() if line.strip()]
     return topics
 
 

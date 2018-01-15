@@ -72,7 +72,7 @@ def deduplicate_folders():
     return 'bash -c "docker run --rm --name=d12baedea506271 --net=host registry.chi2.shopify.io/speedboat:{sha} /app/run-deduplicator.sh"'.format(sha=sha)
 
 def upload_to_gcs(target):
-    return 'cd /u/apps/{target}/shared && HADOOP_USER_NAME=deploy python /u/apps/{target}/current/upload_to_gcs.py /u/apps/{target}/shared/camus.properties /u/apps/{target}/current/upload_topics_to_gcs 1'.format(target=target)
+    return 'bash -c "cd /u/apps/{target}/shared && HADOOP_USER_NAME=deploy python /u/apps/{target}/current/upload_to_gcs.py /u/apps/{target}/shared/camus.properties /u/apps/{target}/current/upload_topics_to_gcs 1"'.format(target=target)
 
 def camus_project(project_name, target, env):
     project = Project(project_name)
