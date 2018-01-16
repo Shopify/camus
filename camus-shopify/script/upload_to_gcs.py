@@ -141,7 +141,7 @@ def upload_dropped_dir(data_directory):
         HDFS.cp(data_directory, destination)
     else:
         logger.info("Copying using distributed copy {src} to {dest}".format(src=data_directory, dest=destination))
-        num_mappers = max(num_files, DIST_MAPPERS)
+        num_mappers = min(num_files, DIST_MAPPERS)
         HDFS.distcp(data_directory, destination, queue=DIST_QUEUE, mappers=num_mappers, mem=DIST_MEM_MB)
     # Sanity check to make sure all files were uploaded as distcp can be flaky
     return check_all_uploaded(data_directory, destination)
