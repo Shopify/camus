@@ -47,11 +47,6 @@ class HDFS(object):
         return result.split()
 
     @staticmethod
-    def count_files(path):
-        result = subprocess.check_output('hadoop fs -ls -C {path} | wc -l'.format(path=path), shell=True)
-        return int(result)
-
-    @staticmethod
     def mkdir(path):
         subprocess.check_output('hadoop fs -mkdir -p {path}'.format(path=path), shell=True)
 
@@ -133,7 +128,8 @@ def upload_all_dropped_folders(exec_folder, topic_whitelist):
 
 def upload_dropped_dir(data_directory):
     # use regular upload for small number of files
-    num_files = HDFS.count_files(data_directory)
+    filelist = HDFS.ls(data_directory)  # we will use these to check the upload
+    num_files = len(filelist)
     destination = data_directory.replace(HDFS_PREFIX, GCS_PREFIX)
     HDFS.mkdir(destination)  # create the parent folder if does not exist
     if num_files < MIN_FILES_FOR_DIST:
@@ -144,13 +140,16 @@ def upload_dropped_dir(data_directory):
         num_mappers = min(num_files, DIST_MAPPERS)
         HDFS.distcp(data_directory, destination, queue=DIST_QUEUE, mappers=num_mappers, mem=DIST_MEM_MB)
     # Sanity check to make sure all files were uploaded as distcp can be flaky
-    return check_all_uploaded(data_directory, destination)
+    return check_all_uploaded(destination, filelist)
 
 
-def check_all_uploaded(src, dest):
-    paths_on_hdfs = set(p.replace(HDFS_PREFIX, "") for p in HDFS.ls(src))
+def check_all_uploaded(dest, filelist):
+    # this does not guarantee that the contents are identical since there may be files written to the source dir
+    # while our copy is taking place, but it's best effort in terms of at the very least the files that were there
+    # before we started the copy should be copies over
+    paths_on_hdfs = set(p.replace(HDFS_PREFIX, "") for p in filelist)
     paths_on_gcs = set(p.replace(GCS_PREFIX, "") for p in HDFS.ls(dest))
-    logger.info("Checking uploaded dirs {src} <-> {dest}".format(src=src, dest=dest))
+    logger.info("Checking uploaded files in {dest}".format(dest=dest))
     not_in_gcs = paths_on_hdfs - paths_on_gcs
     if not_in_gcs:
         logger.error("Missing files in gcs: {}".format(not_in_gcs))
