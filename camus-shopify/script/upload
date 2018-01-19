@@ -13,6 +13,7 @@ base_path = '/u/apps'
 jar_path = os.path.join(os.getcwd(), 'camus-shopify', 'target', 'camus-shopify-0.1.0-shopify1.jar')
 gcs_script_path = os.path.join(os.getcwd(), 'camus-shopify', 'script', 'upload_to_gcs.py')
 gcs_topics_to_upload = os.path.join(os.getcwd(), 'camus-shopify', 'script', 'upload_topics_to_gcs')
+venv = os.path.join(os.getcwd(), 'camus-shopify', 'script', 'venv')
 
 for target in targets:
     target_dir = '/'.join([base_path, target, 'current'])
@@ -20,5 +21,6 @@ for target in targets:
     put(jar_path, target_dir)
     put(gcs_script_path, target_dir)
     put(gcs_topics_to_upload, target_dir)
+    put(venv, target_dir)
 
 print('Completed upload')
