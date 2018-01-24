@@ -204,6 +204,36 @@ class TestCamusPartitionChecker extends FlatSpec with Matchers with BeforeAndAft
 
   }
 
+  it should "not overwrite the existing file flag for a given partition hour" in {
+    tmpDir = Files.createTempDirectory("testcamus").toFile
+    val partitionFolder = "testtopic/2015/10/02/08"
+    val d = new Directory(new File(tmpDir, partitionFolder))
+    d.createDirectory()
+
+    d.list shouldBe empty
+
+    // correct partition base path config
+    CamusPartitionChecker.props.setProperty(CamusPartitionChecker.PARTITION_BASE_PATH, tmpDir.getAbsolutePath)
+
+    CamusPartitionChecker.flagFullyImportedPartitions("_TESTFLAG", false, Map("testtopic" -> Seq((2015, 10, 2, 8))))
+
+    val fileList = d.list.toList
+    fileList should not be empty
+    fileList.map(_.toString()) should contain (tmpDir.getAbsolutePath() + "/testtopic/2015/10/02/08/_TESTFLAG")
+
+    // get modification time of the flag
+    val flagTime = fileList.find(_.toString().endsWith("_TESTFLAG")).get.lastModified
+
+    // watermark again
+    CamusPartitionChecker.flagFullyImportedPartitions("_TESTFLAG", false, Map("testtopic" -> Seq((2015, 10, 2, 8))))
+
+    // the modification time of the flag should not change
+    val fileList2 = d.list.toList
+    val flagTime2 = fileList.find(_.toString().endsWith("_TESTFLAG")).get.lastModified
+
+    flagTime shouldEqual flagTime2
+  }
+
   it should "doesn't fail writing the file flag if the given partition hour folder doesn't exist" in {
     // Original test was checking for failures, this one makes sure it won't fail
     tmpDir = Files.createTempDirectory("testcamus").toFile();

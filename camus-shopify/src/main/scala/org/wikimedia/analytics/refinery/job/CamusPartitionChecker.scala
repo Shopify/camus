@@ -128,11 +128,16 @@ object CamusPartitionChecker {
         val partitionPath: Path = new Path(dir)
         if (fs.exists(partitionPath) && fs.isDirectory(partitionPath)) {
           val flagPath = new Path(s"${dir}/${flag}")
-          if (! dryRun) {
-            fs.create(flagPath)
-            log.info(s"Flag created: ${dir}/${flag}")
-          } else
-            log.info(s"DryRun - Flag would have been created: ${dir}/${flag}")
+          if (! fs.exists(flagPath)) {
+            if (! dryRun) {
+              fs.create(flagPath)
+              log.info(s"Flag created: ${dir}/${flag}")
+            } else
+              log.info(s"DryRun - Flag would have been created: ${dir}/${flag}")
+          }
+          else {
+            log.warn(s"Flag already exists: ${flagPath.toString}")
+          }
         } else
           log.warn(s"Folder does not exist for hour $partitionPath. Can't flag it.")
       }
