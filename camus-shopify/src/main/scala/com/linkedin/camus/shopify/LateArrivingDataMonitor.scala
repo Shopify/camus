@@ -76,8 +76,11 @@ object LateArrivingDataMonitor {
           violationFound = true
           log.error(s"Violation found in ${camusDrop.path}")
           try {
-            val count = camusDrop.violationCount
-            log.error(s"=> late-arriving records for dir ${camusDrop.topicDir} in ${camusDrop.path}: $count")
+            val violationList = camusDrop.violations
+            violationList.foreach({
+              fileAndCount =>
+                log.error(s"=> late-arriving records in file ${fileAndCount._1}: ${fileAndCount._2}")
+            })
             StatsdReporter.gauge(properties, "late-arriving-data", 1L, s"directory:${camusDrop.topicDir}")
           }
           catch {

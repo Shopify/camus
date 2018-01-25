@@ -28,12 +28,26 @@ class CamusHourlyDrop(folderPath: Path, fileSystem: FileSystem) {
 
   def isFlagViolated: Boolean = lastFileWrittenAt > flagWrittenAt
 
+  def getCount(camusFileName: String): Long = {
+    // This relies on how we format file names in EtlMultiOutputCommitter.getPartitionedPath
+    // File names have the following pattern: TopicName.BrokerId.PartitionId.NumberRecords.FinalOffset.UTC.gz
+    camusFileName.split("\\.").takeRight(4).head.toLong
+  }
+
   def violationCount: Long = {
     val flagTime = flagWrittenAt
     fs.listStatus(path).
       filter(status => status.getPath.getName != FLAG_NAME && status.getModificationTime > flagTime).
       map(status => status.getPath.getName).
-      map(name => name.split("\\.")(3).toLong). // this relies on how we format file names in EtlMultiOutputCommitter.getPartitionedPath
+      map(name => getCount(name)).
       sum
+  }
+
+  def violations: List[(String, Long)] = {
+    val flagTime = flagWrittenAt
+    fs.listStatus(path).
+      filter(status => status.getPath.getName != FLAG_NAME && status.getModificationTime > flagTime).
+      map(status => status.getPath).
+      map(path => (path.toString, getCount(path.getName))).toList
   }
 }

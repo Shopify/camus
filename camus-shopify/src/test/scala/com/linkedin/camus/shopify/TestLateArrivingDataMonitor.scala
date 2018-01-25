@@ -1,35 +1,31 @@
 package com.linkedin.camus.shopify
 
-import java.util.Properties
 
-import org.apache.hadoop.conf.Configuration
-import org.apache.hadoop.fs.{Path, FileSystem}
-import org.scalatest.FunSuite
-
-
-class TestLateArrivingDataMonitor extends FunSuite {
-  val fs = FileSystem.get(new Configuration())
+class TestLateArrivingDataMonitor extends CamusTest {
   val window = 1000 * 60 * 60 * 2 // 2 hours
-  val camusHistoryTestFolder = "../camus-shopify/src/test/resources/camus-test-data"
-  val camusDestinationPath = camusHistoryTestFolder + "/topics"
-  val topicsDrop = camusDestinationPath + "/webrequest.text/2015/10/02/06"
-  val props = new Properties()
   props.setProperty("etl.execution.history.path", camusHistoryTestFolder)
-  props.setProperty("etl.destination.path", camusDestinationPath)
-  val flag = new Path(topicsDrop + "/_IMPORTED")
-  val data = new Path(topicsDrop + "/data-part-0")
+
+  val topicsDrop = "webrequest.text/2015/10/02/06"
+  val dataFile = "webrequest.text.11.103.3312.22301266.1516665600000.gz"
+
+  override def beforeEach(): Unit = {
+    super.beforeEach()
+    createTopicPartition(topicsDrop)
+    dropFile(topicsDrop, dataFile)
+    setFlag(topicsDrop)
+  }
 
   test("checkDropsInWindow no late-arriving data") {
-    fs.setTimes(data, 1000000000000L, 0)
-    fs.setTimes(flag, 1300000000000L, 1)
+    fs.setTimes(dataPath(topicsDrop, dataFile), 1000000000000L, 0)
+    fs.setTimes(flagPath(topicsDrop), 1300000000000L, 1)
 
     val violations = LateArrivingDataMonitor.checkDropsInWindow(props, fs, window)
     assert(!violations)
   }
 
   test("checkDropsInWindow with late-arriving data") {
-    fs.setTimes(flag, 1000000000000L, 0)
-    fs.setTimes(data, 1300000000000L, 0)
+    fs.setTimes(flagPath(topicsDrop), 1000000000000L, 0)
+    fs.setTimes(dataPath(topicsDrop, dataFile), 1300000000000L, 0)
 
     val violations = LateArrivingDataMonitor.checkDropsInWindow(props, fs, window)
     assert(violations)
