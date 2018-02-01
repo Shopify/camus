@@ -13,6 +13,7 @@ base_path = '/u/apps'
 jar_path = os.path.join(os.getcwd(), 'camus-shopify', 'target', 'camus-shopify-0.1.0-shopify1.jar')
 gcs_script_path = os.path.join(os.getcwd(), 'camus-shopify', 'script', 'upload_to_gcs.py')
 gcs_topics_to_upload = os.path.join(os.getcwd(), 'camus-shopify', 'script', 'upload_topics_to_gcs')
+gcs_reconciler = os.path.join(os.getcwd(), 'camus-shopify', 'script', 'reconcile.sh')
 sha = os.environ['SHA']
 
 for target in targets:
@@ -24,6 +25,7 @@ for target in targets:
     put(jar_path, target_dir)
     put(gcs_script_path, target_dir)
     put(gcs_topics_to_upload, target_dir)
+    put(gcs_reconciler, target_dir)
 
     run('ln -sfn %s %s' % (target_dir, canonical_dest))
 
