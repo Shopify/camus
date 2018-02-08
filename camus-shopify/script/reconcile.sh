@@ -1,13 +1,15 @@
 CHECK_DATE=$1   # e.g. `date -d "yesterday" '+%Y/%m/%d'`  # e.g. 2017/01/01
 
 TIME_NOW=`date +%s`
+TMP_RECON_STORE=/tmp/camus/reconciler/${TIME_NOW}
 EXIT_CODE=0
+
+echo "Log dir: ${TMP_RECON_STORE}"
 
 while read TOPIC; do
     CHECK_DIR=${TOPIC//_/.}
     echo "Reconciling ${CHECK_DIR}/${CHECK_DATE}"
 
-    TMP_RECON_STORE=/tmp/camus/reconciler/${TIME_NOW}
     CHECK_PATH="data/raw/kafka/${CHECK_DIR}/${CHECK_DATE}"
     mkdir -p ${TMP_RECON_STORE}
 
