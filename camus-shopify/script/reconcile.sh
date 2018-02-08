@@ -1,4 +1,9 @@
 CHECK_DATE=$1   # e.g. `date -d "yesterday" '+%Y/%m/%d'`  # e.g. 2017/01/01
+PROPERTIES=$2
+
+ETL_PATH_SETTING=`cat ${PROPERTIES} | grep etl.destination.path=`
+ETL_PATH="${ETL_PATH_SETTING//etl.destination.path=/}"
+CHECK_PREFIX="${ETL_PATH//hdfs:\/\/hadoop-production\//}"
 
 TIME_NOW=`date +%s`
 TMP_RECON_STORE=/tmp/camus/reconciler/${TIME_NOW}
@@ -10,7 +15,7 @@ while read TOPIC; do
     CHECK_DIR=${TOPIC//_/.}
     echo "Reconciling ${CHECK_DIR}/${CHECK_DATE}"
 
-    CHECK_PATH="data/raw/kafka/${CHECK_DIR}/${CHECK_DATE}"
+    CHECK_PATH="${CHECK_PREFIX}/${CHECK_DIR}/${CHECK_DATE}"
     mkdir -p ${TMP_RECON_STORE}
 
     FILES_ON_HDFS="${TMP_RECON_STORE}/${CHECK_DIR}_on_hdfs.txt"
