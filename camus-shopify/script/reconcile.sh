@@ -33,4 +33,7 @@ while read TOPIC; do
 
 done < upload_topics_to_gcs
 
+# report failure to Datadog
+echo "Camus.UploadToGCSReconciliation.failure:${EXIT_CODE}|g" | nc -w 1 -u localhost 8125
+
 exit ${EXIT_CODE}
