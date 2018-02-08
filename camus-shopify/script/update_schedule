@@ -75,7 +75,7 @@ def upload_to_gcs(target):
     return 'bash -c "cd /u/apps/{target}/shared && HADOOP_USER_NAME=deploy python /u/apps/{target}/current/upload_to_gcs.py /u/apps/{target}/shared/camus.properties /u/apps/{target}/current/upload_topics_to_gcs 1"'.format(target=target)
 
 def reconcile(target, date):
-    return 'bash -c "cd /u/apps/{target}/current && . /u/apps/{target}/current/reconcile.sh {date}"'.format(target=target, date=date)
+    return 'bash -c "cd /u/apps/{target}/current && . /u/apps/{target}/current/reconcile.sh {date} /u/apps/{target}/shared/camus.properties"'.format(target=target, date=date)
 
 def camus_project(project_name, target, env):
     project = Project(project_name)
