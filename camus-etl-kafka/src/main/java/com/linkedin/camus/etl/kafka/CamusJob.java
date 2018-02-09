@@ -370,7 +370,7 @@ public class CamusJob extends Configured implements Tool {
     stopTiming("hadoop");
     startTiming("commit");
 
-    boolean hadExecutionErrors = checkExecutionErrors(fs, newExecutionOutput);
+    boolean hadExecutionErrors = checkExecutionErrors(fs, newExecutionOutput, job.getConfiguration());
 
     checkIfTooManySkippedMsg(counters);
 
@@ -522,7 +522,8 @@ public class CamusJob extends Configured implements Tool {
   }
 
   private boolean checkExecutionErrors(final FileSystem fs,
-                                       final Path newExecutionOutput) throws IOException {
+                                       final Path newExecutionOutput,
+                                       Configuration configuration) throws IOException {
     Map<String, List<Pair<EtlKey, ExceptionWritable>>> errors = readErrors(fs, newExecutionOutput);
 
     // Print any potential errors encountered
@@ -534,12 +535,14 @@ public class CamusJob extends Configured implements Tool {
       final List<Pair<EtlKey, ExceptionWritable>> errorsFromFile = fileEntry.getValue();
       if (errorsFromFile.size() > 0) {
         log.error("Errors from file [" + filePath + "]");
+        StatsdReporter.gauge(configuration, "camus-errors", 1L);
       }
 
       for (final Pair<EtlKey, ExceptionWritable> errorEntry : errorsFromFile) {
         final EtlKey errorKey = errorEntry.getKey();
         final ExceptionWritable errorValue = errorEntry.getValue();
         log.error("Error for EtlKey [" + errorKey + "]: " + errorValue.toString());
+        StatsdReporter.gauge(configuration, "camus-errors", 1L);
       }
     }
 
