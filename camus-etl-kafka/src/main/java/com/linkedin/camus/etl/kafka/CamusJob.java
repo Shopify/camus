@@ -535,7 +535,6 @@ public class CamusJob extends Configured implements Tool {
       final List<Pair<EtlKey, ExceptionWritable>> errorsFromFile = fileEntry.getValue();
       if (errorsFromFile.size() > 0) {
         log.error("Errors from file [" + filePath + "]");
-        StatsdReporter.gauge(configuration, "camus-errors", 1L);
       }
 
       for (final Pair<EtlKey, ExceptionWritable> errorEntry : errorsFromFile) {
