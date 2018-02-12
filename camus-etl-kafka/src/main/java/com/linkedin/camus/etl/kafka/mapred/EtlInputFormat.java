@@ -87,6 +87,11 @@ public class EtlInputFormat extends InputFormat<EtlKey, CamusWrapper> {
   public static final int NUM_TRIES_PARTITION_METADATA = 3;
   public static final int NUM_TRIES_FETCH_FROM_LEADER = 3;
   public static final int NUM_TRIES_TOPIC_METADATA = 3;
+  // Camus will alert if the number-of-offsets-to-process is
+  // FALLING_BEHIND_ALERT_OFFSETS_MULTIPLER times the number-of-offsets-left-in-retention ....
+  public static final int FALLING_BEHIND_ALERT_OFFSETS_MULTIPLER = 3;
+  /// ...but only if the absolute number of offsets to process is greater than FALLING_BEHIND_ALERT_OFFSETS_THRESHOLD
+  public static final int FALLING_BEHIND_ALERT_OFFSETS_THRESHOLD = 1000000;
 
   public static boolean reportJobFailureDueToOffsetOutOfRange = false;
   public static boolean reportJobFailureUnableToGetOffsetFromKafka = false;
@@ -404,6 +409,9 @@ public class EtlInputFormat extends InputFormat<EtlKey, CamusWrapper> {
         request.setAvgMsgSize(key.getMessageSize());
       }
 
+      long numOffsetsToProcess = request.getLastOffset() - request.getOffset();
+      long numOffsetsLeftInRetention = request.getOffset() - request.getEarliestOffset();
+
       if (request.getEarliestOffset() > request.getOffset() || request.getOffset() > request.getLastOffset()) {
         if (request.getEarliestOffset() > request.getOffset()) {
           log.error("The earliest offset was found to be more than the current offset: " + request);
@@ -431,8 +439,8 @@ public class EtlInputFormat extends InputFormat<EtlKey, CamusWrapper> {
                     " to start processing from earliest kafka metadata offset.");
           reportJobFailureDueToOffsetOutOfRange = true;
         }
-      } else if (3 * (request.getOffset() - request.getEarliestOffset())
-          < request.getLastOffset() - request.getOffset()) {
+      } else if (numOffsetsToProcess > FALLING_BEHIND_ALERT_OFFSETS_THRESHOLD &&
+                (numOffsetsToProcess > numOffsetsLeftInRetention * FALLING_BEHIND_ALERT_OFFSETS_MULTIPLER)) {
         camusRequestEmailMessage +=
                 "The current offset is too close to the earliest offset, Camus might be falling behind: "
                     + request + "\n";
