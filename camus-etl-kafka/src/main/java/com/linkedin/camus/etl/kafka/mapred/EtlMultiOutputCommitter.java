@@ -121,10 +121,13 @@ public class EtlMultiOutputCommitter extends FileOutputCommitter {
 
           // upload to gcs
           if (EtlMultiOutputFormat.upoadToGCS(context)) {
+            Configuration googleConfig = context.getConfiguration();
+            googleConfig.set("fs.default.name", EtlMultiOutputFormat.getGCSPrefix(context));
+            FileSystem googleFs = FileSystem.get(googleConfig);
             Path baseOutDirGCS = EtlMultiOutputFormat.getDestinationPathGCS(context);
             Path gcsDest = new Path(baseOutDirGCS, partitionedFile);
             // copy the file that we've committed to gcs
-            uploadFile(context, dest, gcsDest);
+            uploadFile(fs, dest, googleFs, gcsDest, context.getConfiguration());
           }
 
           if (EtlMultiOutputFormat.isRunTrackingPost(context)) {
@@ -181,11 +184,9 @@ public class EtlMultiOutputCommitter extends FileOutputCommitter {
     }
   }
 
-  protected void uploadFile(JobContext job, Path source, Path target) throws IOException {
+  protected void uploadFile(FileSystem sourceFs, Path source,  FileSystem targetFS, Path target, Configuration conf) throws IOException {
     log.info(String.format("Uploading %s to %s", source, target));
-    Configuration conf = job.getConfiguration();
-    FileSystem fs = FileSystem.get(conf);
-    if (!FileUtil.copy(fs, source, fs, target, false, false, conf)) {
+    if (!FileUtil.copy(sourceFs, source, targetFS, target, false, false, conf)) {
       log.error(String.format("Failed to upload from %s to %s", source, target));
     }
   }
