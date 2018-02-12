@@ -10,6 +10,7 @@ import com.linkedin.camus.etl.kafka.common.EmailClient;
 import com.linkedin.camus.etl.kafka.common.EtlKey;
 import com.linkedin.camus.etl.kafka.common.EtlRequest;
 import com.linkedin.camus.etl.kafka.common.LeaderInfo;
+import com.linkedin.camus.etl.kafka.reporter.StatsdReporter;
 import com.linkedin.camus.workallocater.CamusRequest;
 import com.linkedin.camus.workallocater.WorkAllocator;
 
@@ -435,6 +436,7 @@ public class EtlInputFormat extends InputFormat<EtlKey, CamusWrapper> {
         camusRequestEmailMessage +=
                 "The current offset is too close to the earliest offset, Camus might be falling behind: "
                     + request + "\n";
+        StatsdReporter.gauge(context.getConfiguration(), "close-to-earliest-offset", 1L, key.statsdTags());
       }
       log.info(request);
     }
