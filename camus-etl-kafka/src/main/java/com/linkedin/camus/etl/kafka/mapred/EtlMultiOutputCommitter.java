@@ -121,7 +121,7 @@ public class EtlMultiOutputCommitter extends FileOutputCommitter {
 
           // upload to gcs
           if (EtlMultiOutputFormat.upoadToGCS(context)) {
-            Configuration googleConfig = context.getConfiguration();
+            Configuration googleConfig = new Configuration(fs.getConf());
             googleConfig.set("fs.default.name", EtlMultiOutputFormat.getGCSPrefix(context));
             FileSystem googleFs = FileSystem.get(googleConfig);
             Path baseOutDirGCS = EtlMultiOutputFormat.getDestinationPathGCS(context);
