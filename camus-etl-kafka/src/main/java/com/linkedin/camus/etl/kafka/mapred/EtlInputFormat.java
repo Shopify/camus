@@ -10,6 +10,7 @@ import com.linkedin.camus.etl.kafka.common.EmailClient;
 import com.linkedin.camus.etl.kafka.common.EtlKey;
 import com.linkedin.camus.etl.kafka.common.EtlRequest;
 import com.linkedin.camus.etl.kafka.common.LeaderInfo;
+import com.linkedin.camus.etl.kafka.reporter.StatsdReporter;
 import com.linkedin.camus.workallocater.CamusRequest;
 import com.linkedin.camus.workallocater.WorkAllocator;
 
@@ -86,6 +87,9 @@ public class EtlInputFormat extends InputFormat<EtlKey, CamusWrapper> {
   public static final int NUM_TRIES_PARTITION_METADATA = 3;
   public static final int NUM_TRIES_FETCH_FROM_LEADER = 3;
   public static final int NUM_TRIES_TOPIC_METADATA = 3;
+  // Camus will alert if the number-of-offsets-to-process is
+  // FALLING_BEHIND_ALERT_OFFSETS_MULTIPLER times the number-of-offsets-left-in-retention
+  public static final int FALLING_BEHIND_ALERT_OFFSETS_MULTIPLER = 3;
 
   public static boolean reportJobFailureDueToOffsetOutOfRange = false;
   public static boolean reportJobFailureUnableToGetOffsetFromKafka = false;
@@ -397,11 +401,16 @@ public class EtlInputFormat extends InputFormat<EtlKey, CamusWrapper> {
       }
 
       EtlKey key = offsetKeys.get(request);
+      String statsdTags = "";
 
       if (key != null) {
         request.setOffset(key.getOffset());
         request.setAvgMsgSize(key.getMessageSize());
+        statsdTags = key.statsdTags();
       }
+
+      long numOffsetsToProcess = request.getLastOffset() - request.getOffset();
+      long numOffsetsLeftInRetention = request.getOffset() - request.getEarliestOffset();
 
       if (request.getEarliestOffset() > request.getOffset() || request.getOffset() > request.getLastOffset()) {
         if (request.getEarliestOffset() > request.getOffset()) {
@@ -430,11 +439,11 @@ public class EtlInputFormat extends InputFormat<EtlKey, CamusWrapper> {
                     " to start processing from earliest kafka metadata offset.");
           reportJobFailureDueToOffsetOutOfRange = true;
         }
-      } else if (3 * (request.getOffset() - request.getEarliestOffset())
-          < request.getLastOffset() - request.getOffset()) {
+      } else if (numOffsetsToProcess > (numOffsetsLeftInRetention * FALLING_BEHIND_ALERT_OFFSETS_MULTIPLER)) {
         camusRequestEmailMessage +=
                 "The current offset is too close to the earliest offset, Camus might be falling behind: "
                     + request + "\n";
+        StatsdReporter.gauge(context.getConfiguration(), "close-to-earliest-offset", 1L, statsdTags);
       }
       log.info(request);
     }
