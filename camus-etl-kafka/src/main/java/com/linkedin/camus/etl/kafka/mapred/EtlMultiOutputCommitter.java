@@ -123,11 +123,10 @@ public class EtlMultiOutputCommitter extends FileOutputCommitter {
           if (EtlMultiOutputFormat.upoadToGCS(context)) {
             Configuration googleConfig = new Configuration(fs.getConf());
             googleConfig.set("fs.default.name", EtlMultiOutputFormat.getGCSPrefix(context));
-            FileSystem googleFs = FileSystem.newInstance(googleConfig);
             Path baseOutDirGCS = EtlMultiOutputFormat.getDestinationPathGCS(context);
             Path gcsDest = new Path(baseOutDirGCS, partitionedFile);
             // copy the file that we've committed to gcs
-            uploadFile(fs, dest, googleFs, gcsDest, googleConfig);
+            uploadFile(fs, dest, fs, gcsDest, googleConfig);
           }
 
           if (EtlMultiOutputFormat.isRunTrackingPost(context)) {
