@@ -6,6 +6,7 @@ import java.util.*;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
+import com.linkedin.camus.etl.kafka.reporter.StatsdReporter;
 import com.linkedin.camus.shopify.CamusLogger;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.FileStatus;
@@ -183,15 +184,23 @@ public class EtlMultiOutputCommitter extends FileOutputCommitter {
     }
   }
 
-  protected void uploadFile(FileSystem sourceFs, Path source,  FileSystem targetFS, Path target, Configuration conf) throws IOException {
+  protected void uploadFile(FileSystem sourceFs, Path source,  FileSystem targetFS, Path target, Configuration conf) {
     log.info(String.format("Uploading %s to %s", source, target));
+    boolean error = false;
     try {
-      if (!FileUtil.copy(sourceFs, source, targetFS, target, false, false, conf)) {
-        log.error(String.format("Failed to upload from %s to %s", source, target));
+      Path parentDestPath = target.getParent();
+      if (!targetFS.exists(parentDestPath)) {
+        log.info(String.format("Upload target directory does not exist: %s; creating...", parentDestPath));
+        mkdirs(targetFS, parentDestPath);
       }
+      error = (!FileUtil.copy(sourceFs, source, targetFS, target, false, false, conf));
     }
     catch (Exception e) {
+      error = true;
+    }
+    if (error) {
       log.error(String.format("Failed to upload from %s to %s", source, target));
+      StatsdReporter.gauge(conf,"import-upload-error", 1L);
     }
   }
 
