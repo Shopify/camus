@@ -188,15 +188,11 @@ public class EtlMultiOutputCommitter extends FileOutputCommitter {
     log.info(String.format("Uploading %s to %s", source, target));
     boolean error = false;
     try {
-      Path parentDestPath = target.getParent();
-      if (!targetFS.exists(parentDestPath)) {
-        log.info(String.format("Upload target directory does not exist: %s; creating...", parentDestPath));
-        mkdirs(targetFS, parentDestPath);
-      }
       error = (!FileUtil.copy(sourceFs, source, targetFS, target, false, false, conf));
     }
     catch (Exception e) {
       error = true;
+      log.error(e.toString());
     }
     if (error) {
       log.error(String.format("Failed to upload from %s to %s", source, target));
