@@ -1,14 +1,13 @@
 package com.linkedin.camus.etl.kafka.mapred;
 
-import java.io.*;
-import java.lang.reflect.Constructor;
-import java.util.*;
-import java.util.regex.Matcher;
-import java.util.regex.Pattern;
-
+import com.linkedin.camus.etl.RecordWriterProvider;
+import com.linkedin.camus.etl.kafka.common.EtlCounts;
+import com.linkedin.camus.etl.kafka.common.EtlKey;
 import com.linkedin.camus.shopify.CamusLogger;
+import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.FileStatus;
 import org.apache.hadoop.fs.FileSystem;
+import org.apache.hadoop.fs.FileUtil;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.io.NullWritable;
 import org.apache.hadoop.io.SequenceFile;
@@ -18,9 +17,11 @@ import org.apache.hadoop.mapreduce.lib.output.FileOutputCommitter;
 import org.apache.log4j.Logger;
 import org.codehaus.jackson.map.ObjectMapper;
 
-import com.linkedin.camus.etl.RecordWriterProvider;
-import com.linkedin.camus.etl.kafka.common.EtlCounts;
-import com.linkedin.camus.etl.kafka.common.EtlKey;
+import java.io.*;
+import java.lang.reflect.Constructor;
+import java.util.*;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
 
 public class EtlMultiOutputCommitter extends FileOutputCommitter {
@@ -34,6 +35,12 @@ public class EtlMultiOutputCommitter extends FileOutputCommitter {
   private TaskAttemptContext context;
   private final RecordWriterProvider recordWriterProvider;
   private CamusLogger log;
+
+  public static enum FILE_COMMITTER {
+    MOVE_SUCCESS,
+    UPLOAD_SUCCESS,
+    UPLOAD_FAILURE
+  };
 
   private void mkdirs(FileSystem fs, Path path) throws IOException {
     if (!fs.exists(path.getParent())) {
@@ -113,9 +120,27 @@ public class EtlMultiOutputCommitter extends FileOutputCommitter {
 
           commitFile(context, f.getPath(), dest);
           log.info("Moved file from: " + f.getPath() + " to: " + dest);
+          context.getCounter(FILE_COMMITTER.MOVE_SUCCESS).increment(1);
 
           // record the fact that we committed data to a path
           pathsWritten.add(parentDestPath.toString());
+
+          // upload to gcs
+          try {
+            if (EtlMultiOutputFormat.upoadToGCS(context)) {
+              Configuration googleConfig = new Configuration(fs.getConf());
+              googleConfig.set("fs.default.name", EtlMultiOutputFormat.getGCSPrefix(context));
+              FileSystem googleFs = FileSystem.newInstance(googleConfig);
+              Path baseOutDirGCS = EtlMultiOutputFormat.getDestinationPathGCS(context);
+              Path gcsDest = new Path(baseOutDirGCS, partitionedFile);
+              // copy the file that we've committed to gcs
+              uploadFile(fs, dest, googleFs, gcsDest, googleConfig);
+            }
+          } catch (Exception e) {
+            log.error(String.format("Failed to upload %s", dest));
+            log.error(e.toString());
+            context.getCounter(FILE_COMMITTER.UPLOAD_FAILURE).increment(1);
+          }
 
           if (EtlMultiOutputFormat.isRunTrackingPost(context)) {
             count.writeCountsToMap(allCountObject, fs, new Path(workPath, EtlMultiOutputFormat.COUNTS_PREFIX + "."
@@ -168,6 +193,16 @@ public class EtlMultiOutputCommitter extends FileOutputCommitter {
     if (!FileSystem.get(job.getConfiguration()).rename(source, target)) {
       log.error(String.format("Failed to move from %s to %s", source, target));
       throw new IOException(String.format("Failed to move from %s to %s", source, target));
+    }
+  }
+
+  protected void uploadFile(FileSystem sourceFs, Path source,  FileSystem targetFS, Path target, Configuration conf) throws IOException {
+    log.info(String.format("Uploading %s to %s", source, target));
+    if (!FileUtil.copy(sourceFs, source, targetFS, target, false, false, conf)) {
+        throw new IOException(String.format("Failed to upload from %s to %s", source, target));
+    }
+    else {
+      context.getCounter(FILE_COMMITTER.UPLOAD_SUCCESS).increment(1);
     }
   }
 
