@@ -32,6 +32,9 @@ import com.linkedin.camus.etl.kafka.partitioner.DefaultPartitioner;
 
 public class EtlMultiOutputFormat extends FileOutputFormat<EtlKey, Object> {
   public static final String ETL_DESTINATION_PATH = "etl.destination.path";
+  public static final String ETL_DESTINATION_PATH_GCS = "etl.destination.path.gcs";
+  public static final String ETL_UPLOAD_TO_GCS = "etl.gcs.upload";
+  public static final String ETL_UPLOAD_TO_GCS_PREFIX = "etl.gcs.prefix";
   public static final String ETL_DESTINATION_PATH_TOPIC_SUBDIRECTORY = "etl.destination.path.topic.sub.dir";
   public static final String ETL_DESTINATION_PATH_TOPIC_SUBDIRFORMAT = "etl.destination.path.topic.sub.dirformat";
   public static final String ETL_DESTINATION_PATH_TOPIC_SUBDIRFORMAT_LOCALE = "etl.destination.path.topic.sub.dirformat.locale";
@@ -109,6 +112,18 @@ public class EtlMultiOutputFormat extends FileOutputFormat<EtlKey, Object> {
 
   public static Path getDestinationPath(JobContext job) {
     return new Path(job.getConfiguration().get(ETL_DESTINATION_PATH));
+  }
+
+  public static Path getDestinationPathGCS(JobContext job) {
+    return new Path(job.getConfiguration().get(ETL_DESTINATION_PATH_GCS));
+  }
+
+  public static Boolean upoadToGCS(JobContext job) {
+    return job.getConfiguration().getBoolean(ETL_UPLOAD_TO_GCS, false);
+  }
+
+  public static String getGCSPrefix(JobContext job) {
+    return job.getConfiguration().get(ETL_UPLOAD_TO_GCS_PREFIX);
   }
 
   public static void setDestPathTopicSubDir(JobContext job, String subPath) {
