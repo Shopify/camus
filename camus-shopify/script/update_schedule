@@ -102,17 +102,6 @@ def camus_project(project_name, target, env):
                           'type': 'command',
                           'command': deduplicate_folders()
                           }))
-    project.add_job("CamusUploadToGCS",
-                         Job({'failure.emails': None,
-                              'type': 'command',
-                              'command': upload_to_gcs(target)
-                          }))
-    project.add_job("CamusGCS-Reconcile-Yesterday",
-                    Job({'failure.emails': None,
-                         'type': 'command',
-                         'command': reconcile(target, date="""`date -d "yesterday" '+%Y/%m/%d'`""")
-                         }))
-
 
     return project
 
