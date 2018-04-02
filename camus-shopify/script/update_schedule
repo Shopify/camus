@@ -52,20 +52,6 @@ def camus_job(target):
     camus_command += 'com.linkedin.camus.etl.kafka.CamusJob -P /u/apps/%(target)s/shared/camus.properties"'
     return camus_command % {'target': target, 'job_name': job_name}
 
-def camus_watemark_job(target):
-    camus_watermark_cmd = 'bash -c "'
-    camus_watermark_cmd += 'java -Xms1G -Xmx2G -DHADOOP_USER_NAME=deploy -Dlog4j.configuration=file:/u/apps/%(target)s/shared/log4j.xml '
-    camus_watermark_cmd += '-cp $(hadoop classpath):/u/apps/%(target)s/current/camus-shopify-0.1.0-shopify1.jar:/etc/camus:/etc/hadoop/conf '
-    camus_watermark_cmd += 'org.wikimedia.analytics.refinery.job.CamusPartitionChecker -c /u/apps/%(target)s/shared/camus.properties --delay-hours 4"'
-    return camus_watermark_cmd % {'target': target}
-
-def lad_monitor_job(target):
-    monitor_cmd = 'bash -c "'
-    monitor_cmd += 'java -Xms1G -Xmx2G -DHADOOP_USER_NAME=deploy -Dlog4j.configuration=file:/u/apps/%(target)s/shared/log4j.xml '
-    monitor_cmd += '-cp $(hadoop classpath):/u/apps/%(target)s/current/camus-shopify-0.1.0-shopify1.jar:/etc/camus:/etc/hadoop/conf '
-    monitor_cmd += 'com.linkedin.camus.shopify.LateArrivingDataMonitor -c /u/apps/%(target)s/shared/camus.properties -t runs -r 1"'
-    return monitor_cmd % {'target': target}
-
 def deduplicate_folders():
     # sha of when the deduplicator was first deployed, modify as needed
     sha = 'd12baedea506271f1467776691c1ed8329fa8d5e'
@@ -86,16 +72,6 @@ def camus_project(project_name, target, env):
                     Job({'failure.emails': failure_email,
                          'type': 'command',
                          'command': camus_job(target)
-                         }))
-    project.add_job("Watermark",
-                    Job({'failure.emails': failure_email,
-                         'type': 'command',
-                         'command': camus_watemark_job(target)
-                         }))
-    project.add_job("Late-Arriving-Data Monitor",
-                    Job({'failure.emails': None,  # never send emails to pagerduty for this alert
-                         'type': 'command',
-                         'command': lad_monitor_job(target)
                          }))
     project.add_job("DedupFolders",
                      Job({'failure.emails': None,
@@ -118,8 +94,6 @@ def camus_project(project_name, target, env):
 
 def schedule_jobs(project_name, session):
     session.schedule_workflow(project_name, 'Import',                     date='01/01/2015', time="11,30,AM,UTC", period="1h",  concurrent=False)
-    session.schedule_workflow(project_name, 'Watermark',                  date='01/01/2015', time="12,20,AM,UTC", period="1h",  concurrent=False)
-    session.schedule_workflow(project_name, 'Late-Arriving-Data Monitor', date='01/01/2015', time="12,25,AM,UTC", period="1h",  concurrent=False)
     session.schedule_workflow(project_name, 'CamusUploadToGCS',           date='01/01/2015', time="12,30,AM,UTC", period="1h",  concurrent=False)
     session.schedule_workflow(project_name, 'CamusGCS-Reconcile-Yesterday', date='01/01/2015', time="16,00,PM,UTC", period="1d",  concurrent=False)
 
