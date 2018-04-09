@@ -35,6 +35,7 @@ public class EtlMultiOutputCommitter extends FileOutputCommitter {
   private TaskAttemptContext context;
   private final RecordWriterProvider recordWriterProvider;
   private CamusLogger log;
+  private int MAX_GCS_UPLOAD_RETRIES = 3;
 
   public static enum FILE_COMMITTER {
     MOVE_SUCCESS,
@@ -126,20 +127,8 @@ public class EtlMultiOutputCommitter extends FileOutputCommitter {
           pathsWritten.add(parentDestPath.toString());
 
           // upload to gcs
-          try {
-            if (EtlMultiOutputFormat.upoadToGCS(context)) {
-              Configuration googleConfig = new Configuration(fs.getConf());
-              googleConfig.set("fs.default.name", EtlMultiOutputFormat.getGCSPrefix(context));
-              FileSystem googleFs = FileSystem.newInstance(googleConfig);
-              Path baseOutDirGCS = EtlMultiOutputFormat.getDestinationPathGCS(context);
-              Path gcsDest = new Path(baseOutDirGCS, partitionedFile);
-              // copy the file that we've committed to gcs
-              uploadFile(fs, dest, googleFs, gcsDest, googleConfig);
-            }
-          } catch (Exception e) {
-            log.error(String.format("Failed to upload %s", dest));
-            log.error(e.toString());
-            context.getCounter(FILE_COMMITTER.UPLOAD_FAILURE).increment(1);
+          if (EtlMultiOutputFormat.upoadToGCS(context)) {
+            uploadToGcs(context, fs, partitionedFile, dest);
           }
 
           if (EtlMultiOutputFormat.isRunTrackingPost(context)) {
@@ -186,6 +175,31 @@ public class EtlMultiOutputCommitter extends FileOutputCommitter {
     br.close();
 
     super.commitTask(context);
+  }
+
+  private void uploadToGcs(TaskAttemptContext context, FileSystem fs, String partitionedFile, Path dest) {
+    for (int retries = 0; retries <= MAX_GCS_UPLOAD_RETRIES; retries++) {
+      try {
+        Configuration googleConfig = new Configuration(fs.getConf());
+        googleConfig.set("fs.default.name", EtlMultiOutputFormat.getGCSPrefix(context));
+        // FileSystem.newInstace could throw IOException which is why I'm keeping
+        // all of this setup inside the try block despite being potentially wasteful.
+        FileSystem googleFs = FileSystem.newInstance(googleConfig);
+        Path baseOutDirGCS = EtlMultiOutputFormat.getDestinationPathGCS(context);
+        Path gcsDest = new Path(baseOutDirGCS, partitionedFile);
+        // copy the file that we've committed to gcs
+        uploadFile(fs, dest, googleFs, gcsDest, googleConfig);
+        return;
+      } catch (Exception e) {
+        if (retries < MAX_GCS_UPLOAD_RETRIES) {
+          log.error(String.format("Failed uploading %s, will re-try (retries so far: %d)", dest, retries));
+        } else {
+          log.error(String.format("Failed to upload %s", dest));
+          log.error(e.toString());
+          context.getCounter(FILE_COMMITTER.UPLOAD_FAILURE).increment(1);
+        }
+      }
+    }
   }
 
   protected void commitFile(JobContext job, Path source, Path target) throws IOException {
