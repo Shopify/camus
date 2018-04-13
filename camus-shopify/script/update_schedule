@@ -57,9 +57,6 @@ def deduplicate_folders():
     sha = 'd12baedea506271f1467776691c1ed8329fa8d5e'
     return 'bash -c "docker run --rm --name=d12baedea506271 --net=host registry.chi2.shopify.io/speedboat:{sha} /app/run-deduplicator.sh"'.format(sha=sha)
 
-def upload_to_gcs(target):
-    return 'bash -c "cd /u/apps/{target}/shared && . .venv/bin/activate && HADOOP_USER_NAME=deploy python /u/apps/{target}/current/upload_to_gcs.py /u/apps/{target}/shared/camus.properties /u/apps/{target}/current/upload_topics_to_gcs --executions 3"'.format(target=target)
-
 def reconcile(target, date):
     return 'bash -c "cd /u/apps/{target}/current && . /u/apps/{target}/current/reconcile.sh {date} /u/apps/{target}/shared/camus.properties"'.format(target=target, date=date)
 
@@ -78,11 +75,6 @@ def camus_project(project_name, target, env):
                           'type': 'command',
                           'command': deduplicate_folders()
                           }))
-    project.add_job("CamusUploadToGCS",
-                         Job({'failure.emails': None,
-                              'type': 'command',
-                              'command': upload_to_gcs(target)
-                          }))
     project.add_job("CamusGCS-Reconcile-Yesterday",
                     Job({'failure.emails': None,
                          'type': 'command',
@@ -94,7 +86,6 @@ def camus_project(project_name, target, env):
 
 def schedule_jobs(project_name, session):
     session.schedule_workflow(project_name, 'Import',                     date='01/01/2015', time="11,30,AM,UTC", period="1h",  concurrent=False)
-    session.schedule_workflow(project_name, 'CamusUploadToGCS',           date='01/01/2015', time="12,30,AM,UTC", period="1h",  concurrent=False)
     session.schedule_workflow(project_name, 'CamusGCS-Reconcile-Yesterday', date='01/01/2015', time="16,00,PM,UTC", period="1d",  concurrent=False)
 
 def main():
