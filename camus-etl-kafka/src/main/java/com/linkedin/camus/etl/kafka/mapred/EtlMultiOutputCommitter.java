@@ -33,7 +33,6 @@ public class EtlMultiOutputCommitter extends FileOutputCommitter {
   private HashSet<String> pathsWritten = new HashSet<String>();
   private HashSet<Path> filesWritten = new HashSet<Path>();
   private Path outputPath;
-  private int writes = 0;
 
   private TaskAttemptContext context;
   private final RecordWriterProvider recordWriterProvider;
@@ -196,15 +195,6 @@ public class EtlMultiOutputCommitter extends FileOutputCommitter {
 
   protected void commitFile(JobContext job, Path source, Path target) throws IOException {
     log.info(String.format("Moving %s to %s", source, target));
-    this.writes = this.writes + 1;
-    if (this.writes > 1) {
-      try {
-        Thread.sleep(10000);
-      } catch (InterruptedException e) {
-        //
-      }
-      throw new IOException("yeah, you bet");
-    }
     if (!FileSystem.get(job.getConfiguration()).rename(source, target)) {
       log.error(String.format("Failed to move from %s to %s", source, target));
       throw new IOException(String.format("Failed to move from %s to %s", source, target));
