@@ -5,10 +5,7 @@ import com.linkedin.camus.etl.kafka.common.EtlCounts;
 import com.linkedin.camus.etl.kafka.common.EtlKey;
 import com.linkedin.camus.shopify.CamusLogger;
 import org.apache.hadoop.conf.Configuration;
-import org.apache.hadoop.fs.FileStatus;
-import org.apache.hadoop.fs.FileSystem;
-import org.apache.hadoop.fs.FileUtil;
-import org.apache.hadoop.fs.Path;
+import org.apache.hadoop.fs.*;
 import org.apache.hadoop.io.NullWritable;
 import org.apache.hadoop.io.SequenceFile;
 import org.apache.hadoop.mapreduce.JobContext;
@@ -35,6 +32,8 @@ public class EtlMultiOutputCommitter extends FileOutputCommitter {
   private TaskAttemptContext context;
   private final RecordWriterProvider recordWriterProvider;
   private CamusLogger log;
+
+  private int MAX_HDFS_COMMIT_RETRIES = 3;
 
   public static enum FILE_COMMITTER {
     MOVE_SUCCESS,
@@ -189,10 +188,32 @@ public class EtlMultiOutputCommitter extends FileOutputCommitter {
   }
 
   protected void commitFile(JobContext job, Path source, Path target) throws IOException {
-    log.info(String.format("Moving %s to %s", source, target));
-    if (!FileSystem.get(job.getConfiguration()).rename(source, target)) {
-      log.error(String.format("Failed to move from %s to %s", source, target));
-      throw new IOException(String.format("Failed to move from %s to %s", source, target));
+    for (int retries = 0; retries <= MAX_HDFS_COMMIT_RETRIES; retries++) {
+      log.info(String.format("Moving %s to %s (attempt %d)", source, target, retries + 1));
+      try {
+        FileSystem fs = FileSystem.get(job.getConfiguration());
+        if (fs.exists(target) && retries > 0) {
+          log.warn(String.format("%s already exists. Nothing to do.", target));
+          return;
+        }
+
+        if (!FileSystem.get(job.getConfiguration()).rename(source, target)) {
+          log.error(String.format("Failed to move from %s to %s", source, target));
+          throw new IOException(String.format("Failed to move from %s to %s", source, target));
+        } else {
+          if (retries < 3) {
+            throw new IOException(String.format("Fake Failed to move from %s to %s", source, target));
+          }
+        }
+        return;
+      } catch (Exception e) {
+        if (retries < MAX_HDFS_COMMIT_RETRIES) {
+          log.error(String.format("Failed committing %s to %s, will re-try", source, target));
+        } else {
+          log.error(String.format("Failed to commit %s to %s, failing task", source, target));
+          throw new IOException(String.format("Failed to move from %s to %s", source, target));
+        }
+      }
     }
   }
 
