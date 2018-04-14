@@ -31,6 +31,8 @@ public class EtlMultiOutputCommitter extends FileOutputCommitter {
   private HashMap<String, EtlKey> offsets = new HashMap<String, EtlKey>();
   private HashMap<String, Long> eventCounts = new HashMap<String, Long>();
   private HashSet<String> pathsWritten = new HashSet<String>();
+  private HashSet<Path> filesWritten = new HashSet<Path>();
+  private Path outputPath;
 
   private TaskAttemptContext context;
   private final RecordWriterProvider recordWriterProvider;
@@ -76,6 +78,7 @@ public class EtlMultiOutputCommitter extends FileOutputCommitter {
 
   public EtlMultiOutputCommitter(Path outputPath, TaskAttemptContext context, Logger log) throws IOException {
     super(outputPath, context);
+    this.outputPath = outputPath;
     this.context = context;
     try {
       //recordWriterProvider = EtlMultiOutputFormat.getRecordWriterProviderClass(context).newInstance();
@@ -124,6 +127,8 @@ public class EtlMultiOutputCommitter extends FileOutputCommitter {
 
           // record the fact that we committed data to a path
           pathsWritten.add(parentDestPath.toString());
+
+          filesWritten.add(dest);
 
           // upload to gcs
           try {
@@ -223,5 +228,39 @@ public class EtlMultiOutputCommitter extends FileOutputCommitter {
         leaderId, Integer.parseInt(partition), count, offset, encodedPartition);
 
     return partitionedPath + recordWriterProvider.getFilenameExtension();
+  }
+
+  public void cleanupJob(JobContext context) throws IOException {
+    Path tempPath = new Path(this.outputPath, "_temporary");
+    log.info("Cleaning up job. Preserving directory for analysis/salvaging: " + tempPath.toString());
+  }
+
+  public void abortTask(TaskAttemptContext context) throws IOException {
+    Path taskAttemptPath = this.getTaskAttemptPath(context);
+    log.info("Aborting task. Preserving directory for analysis/salvaging: " + taskAttemptPath.toString());
+    log.info("Attempting to rollback committed files");
+
+    FileSystem fs = taskAttemptPath.getFileSystem(context.getConfiguration());
+    for (Path file : filesWritten) {
+      log.info("Rolling back committed file: " + file.toString());
+      if (!fs.delete(file, false)) {
+        throw new IOException(String.format("Failed to rollback file: %s ", file.toString()));
+      }
+
+      // rollback from GCS
+      if (EtlMultiOutputFormat.upoadToGCS(context)) {
+        Configuration googleConfig = new Configuration(fs.getConf());
+        googleConfig.set("fs.default.name", EtlMultiOutputFormat.getGCSPrefix(context));
+        FileSystem googleFs = FileSystem.newInstance(googleConfig);
+        Path baseOutDirGCS = EtlMultiOutputFormat.getDestinationPathGCS(context);
+        Path gcsDest = new Path(baseOutDirGCS, file);
+        // remove the file that we've committed to gcs
+        log.info(String.format("Deleting %s from GCS", gcsDest));
+
+        if (!googleFs.delete(gcsDest, false)) {
+          throw new IOException(String.format("Failed deleting file from GCS: %s", gcsDest.toString()));
+        }
+      }
+    }
   }
 }
